@@ -1,69 +1,62 @@
-import 'excerpt.dart';
-
 class Chapter {
   // 🔒 Attributs privés
   String _id;
-  String _bookId;
   String _title;
   DateTime _createdAt;
+  String _bookId;
+  bool _isSynced;
+  String _userId;
 
-  // 🔗 Relation : un chapitre contient plusieurs extraits
-  List<Excerpt>? _excerpts;
-
-  // 🔹 Constructeur avec paramètres nommés
+  // 🧱 Constructeur
   Chapter({
     required String id,
-    required String bookId,
     required String title,
     required DateTime createdAt,
-    List<Excerpt>? excerpts,
+    required String bookId,
+    required bool isSynced,
+    required String userId,
   })  : _id = id,
-        _bookId = bookId,
         _title = title,
         _createdAt = createdAt,
-        _excerpts = excerpts;
+        _bookId = bookId,
+        _isSynced = isSynced,
+        _userId = userId;
 
-  // 🔹 Getters
+  // 🧩 Getters
   String get id => _id;
-  String get bookId => _bookId;
   String get title => _title;
   DateTime get createdAt => _createdAt;
-  List<Excerpt>? get excerpts => _excerpts;
+  String get bookId => _bookId;
+  bool get isSynced => _isSynced;
+  String get userId => _userId;
 
-  // 🔹 Setter pour ajouter des extraits
-  set excerpts(List<Excerpt>? value) => _excerpts = value;
+  // ✏️ Setters
+  set title(String value) => _title = value;
+  set bookId(String value) => _bookId = value;
+  set isSynced(bool value) => _isSynced = value;
+  set userId(String value) => _userId = value;
 
-  void addExcerpt(Excerpt excerpt) {
-    _excerpts ??= [];
-    _excerpts!.add(excerpt);
-  }
-
-  // 🔹 Factory constructor pour JSON
+  // 🔁 Convertir depuis JSON (lecture depuis Supabase)
   factory Chapter.fromJson(Map<String, dynamic> json) {
     return Chapter(
-      id: json['id'],
-      bookId: json['book_id'],
-      title: json['title'],
-      createdAt: DateTime.parse(json['created_at']),
-      excerpts: json['excerpts'] != null
-          ? List<Excerpt>.from(
-          json['excerpts'].map((e) => Excerpt.fromJson(e)))
-          : null,
+      id: json['id'] as String,
+      title: json['title'] as String,
+      createdAt: json['created_at'],
+      bookId: json['book_id'] as String,
+      isSynced: json['isSynced'] as bool,
+      userId: json['user_id'] as String,
     );
   }
 
-  // 🔹 Méthode pour convertir en JSON
+  // 🔁 Convertir vers JSON (insertion dans Supabase)
   Map<String, dynamic> toJson() {
     return {
       'id': _id,
-      'book_id': _bookId,
       'title': _title,
       'created_at': _createdAt.toIso8601String(),
+      'book_id': _bookId,
+      'isSynced': _isSynced,
+      'user_id': _userId,
     };
-  }
-
-  @override
-  String toString() {
-    return 'Chapter(id: $_id, title: $_title, bookId: $_bookId)';
   }
 }

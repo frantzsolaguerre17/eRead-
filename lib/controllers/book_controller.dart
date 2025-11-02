@@ -1,40 +1,43 @@
-import 'package:flutter/foundation.dart';
+import 'package:flutter/material.dart';
 import '../models/book.dart';
 import '../services/book_service.dart';
 
-class BookController with ChangeNotifier {
+class BookController extends ChangeNotifier {
+  final BookService _service = BookService();
 
-  final BookService _bookService = BookService();
   List<Book> _books = [];
+  bool isLoading = false; // ✅ ajoute ce booléen
 
   List<Book> get books => _books;
-  bool isLoading = false;
 
-
-  /// 🔹 Get books
+  /// 🔹 Charger tous les livres
   Future<void> fetchBooks() async {
     isLoading = true;
     notifyListeners();
 
     try {
-      _books = await _bookService.getAllBooks();
+      _books = await _service.getBooks();
     } catch (e) {
-      print('Erreur: $e');
-    } finally {
-      isLoading = false;
-      notifyListeners();
+      debugPrint("Erreur fetchBooks: $e");
     }
+
+    isLoading = false;
+    notifyListeners();
   }
 
+  /// 🔹 Ajouter un nouveau livre
+  Future<void> addBook(Book newBook) async {
+    isLoading = true;
+    notifyListeners();
 
-  /// 🔹 Add book
-  Future<void> addBook(Book book) async {
     try {
-      await _bookService.addBook(book);
-      _books.add(book);
-      notifyListeners();
+      await _service.addBook(newBook);
+      _books.add(newBook);
     } catch (e) {
-      print('Erreur lors de l\'ajout du livre: $e');
+      debugPrint("Erreur addBook: $e");
     }
+
+    isLoading = false;
+    notifyListeners();
   }
 }

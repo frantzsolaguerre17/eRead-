@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import '../controllers/book_controller.dart';
 import '../views/book_screen.dart';
 
@@ -12,29 +13,30 @@ class DashboardScreen extends StatefulWidget {
 
 class _DashboardScreenState extends State<DashboardScreen>
     with SingleTickerProviderStateMixin {
+  final supabase = Supabase.instance.client;
   late AnimationController _controller;
-  late Animation<double> _fadeAnimation;
-  late Animation<Offset> _slideAnimation;
+  late Animation<double> _fadeAnim;
+  String displayName = 'Utilisateur';
 
   @override
   void initState() {
     super.initState();
-
-    // 🎬 Animation d’apparition
-    _controller =
-        AnimationController(vsync: this, duration: const Duration(milliseconds: 800));
-
-    _fadeAnimation = CurvedAnimation(
-      parent: _controller,
-      curve: Curves.easeInOut,
+    _loadDisplayName();
+    _controller = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 800),
     );
-
-    _slideAnimation = Tween<Offset>(
-      begin: const Offset(0, 0.2),
-      end: Offset.zero,
-    ).animate(CurvedAnimation(parent: _controller, curve: Curves.easeOut));
-
+    _fadeAnim = CurvedAnimation(parent: _controller, curve: Curves.easeInOut);
     _controller.forward();
+  }
+
+  void _loadDisplayName() {
+    final user = supabase.auth.currentUser;
+    if (user != null) {
+      setState(() {
+        displayName = user.userMetadata?['full_name'] ?? 'Utilisateur';
+      });
+    }
   }
 
   @override
@@ -48,142 +50,151 @@ class _DashboardScreenState extends State<DashboardScreen>
     final bookController = Provider.of<BookController>(context);
 
     return Scaffold(
-      backgroundColor: Colors.grey[100],
-      appBar: AppBar(
-        title: const Text(
-          'Mémo Livre 📘',
-          style: TextStyle(fontWeight: FontWeight.bold),
-        ),
-        centerTitle: true,
-        backgroundColor: Colors.blueGrey[700],
-        elevation: 2,
-      ),
+      backgroundColor: Colors.grey[50],
       body: FadeTransition(
-        opacity: _fadeAnimation,
-        child: SlideTransition(
-          position: _slideAnimation,
-          child: SingleChildScrollView(
-            child: Padding(
-              padding: const EdgeInsets.all(16.0),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Text(
-                    "Bonjour Frantzso 👋",
-                    style: TextStyle(
-                      fontSize: 24,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.black87,
+        opacity: _fadeAnim,
+        child: CustomScrollView(
+          slivers: [
+            // 🧢 AppBar en dégradé
+            SliverAppBar(
+              backgroundColor: Colors.teal.shade600,
+              expandedHeight: 170,
+              floating: false,
+              pinned: true,
+              flexibleSpace: FlexibleSpaceBar(
+                title: Text(
+                  "eRead",
+                  style: const TextStyle(
+                    fontWeight: FontWeight.bold,
+                    color: Colors.white,
+                  ),
+                ),
+                background: Container(
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      colors: [Colors.teal.shade700, Colors.teal.shade400],
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
                     ),
                   ),
-                  const SizedBox(height: 20),
+                ),
+              ),
+              elevation: 2,
+            ),
 
-                  // 🔹 Cartes d'informations verticales
-                  _buildInfoCard(
-                    icon: Icons.book,
-                    title: "Livres ajoutés",
-                    value: "${bookController.books.length}",
-                    color: Colors.indigo,
-                  ),
-                  const SizedBox(height: 16),
-                  _buildInfoCard(
-                    icon: Icons.translate,
-                    title: "Mots appris",
-                    value: "0",
-                    color: Colors.teal,
-                  ),
-
-                  const SizedBox(height: 30),
-
-                  // 🖼️ Image décorative
-                  Center(
-                    child: ClipRRect(
-                      borderRadius: BorderRadius.circular(20),
-                      child: Image.asset(
-                        'assets/images/lire_livre.png', // ✅ mets ton image ici
-                        height: 220,
-                        fit: BoxFit.cover,
+            // 🌿 Contenu principal
+            SliverToBoxAdapter(
+              child: Padding(
+                padding: const EdgeInsets.all(20.0),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // 👋 Section Bonjour
+                    Text(
+                      "Bonjour, $displayName 👋",
+                      style: const TextStyle(
+                        fontSize: 26,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.black87,
                       ),
                     ),
-                  ),
-                  const SizedBox(height: 100),
-                ],
+                    const SizedBox(height: 8),
+                    Text(
+                      "Prêt à lire quelque chose d'inspirant aujourd’hui ?",
+                      style: TextStyle(color: Colors.grey[600], fontSize: 16),
+                    ),
+                    const SizedBox(height: 25),
+
+                    // 📊 Statistiques
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        _buildStatCard(
+                          "Livres",
+                          "${bookController.books.length}",
+                          Icons.menu_book_rounded,
+                          Colors.teal,
+                        ),
+                        _buildStatCard(
+                          "Favoris",
+                          "0",
+                          Icons.favorite,
+                          Colors.redAccent,
+                        ),
+                        _buildStatCard(
+                          "Mots appris",
+                          "0",
+                          Icons.text_fields,
+                          Colors.amber,
+                        ),
+                      ],
+                    ),
+
+                    const SizedBox(height: 40),
+
+                    // ⚡ Accès rapide
+                    Text(
+                      "Accès rapide",
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.w600,
+                        color: Colors.grey[800],
+                      ),
+                    ),
+                    const SizedBox(height: 20),
+
+                    // 🎯 Icônes de navigation
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceAround,
+                      children: [
+                        _buildQuickAction(
+                          icon: Icons.book_rounded,
+                          label: "Mes livres",
+                          color: Colors.teal,
+                          onTap: () => Navigator.of(context).push(_createRoute()),
+                        ),
+                        _buildQuickAction(
+                          icon: Icons.star_border_rounded,
+                          label: "Favoris",
+                          color: Colors.amber.shade700,
+                          onTap: () {},
+                        ),
+                        _buildQuickAction(
+                          icon: Icons.person_outline,
+                          label: "Profil",
+                          color: Colors.blueGrey,
+                          onTap: () {},
+                        ),
+                      ],
+                    ),
+
+                    const SizedBox(height: 40),
+
+                    // 🖼 Illustration
+                  /*  Center(
+                      child: Column(
+                        children: [
+                          Image.asset(
+                            'assets/images/lire_livre.png',
+                            height: 220,
+                            fit: BoxFit.cover,
+                          ),
+                          const SizedBox(height: 16),
+                          Text(
+                            "Découvre, lis et grandis 📖",
+                            style: TextStyle(
+                              color: Colors.teal.shade700,
+                              fontSize: 18,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 100),*/
+                  ],
+                ),
               ),
-            ),
-          ),
-        ),
-      ),
-
-      // ➕ Bouton flottant stylisé
-        floatingActionButton: FloatingActionButton.extended( 
-          onPressed: () {
-            Navigator.of(context).push(_createRoute());
-          },
-          backgroundColor: Colors.blueGrey[700],
-          elevation: 5,
-          icon: const Icon(Icons.book, size: 28, color: Colors.white),
-          label: const Text(
-            "Ajouter un livre",
-            style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-          ),
-        ),
-        floatingActionButtonLocation: FloatingActionButtonLocation.centerFloat,
-    );
-  }
-
-  /// 🔹 Widget pour afficher une carte d'information
-  Widget _buildInfoCard({
-    required IconData icon,
-    required String title,
-    required String value,
-    required Color color,
-  }) {
-    return AnimatedContainer(
-      duration: const Duration(milliseconds: 600),
-      curve: Curves.easeInOut,
-      width: double.infinity,
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(18),
-        boxShadow: [
-          BoxShadow(
-            color: color.withOpacity(0.2),
-            blurRadius: 8,
-            offset: const Offset(0, 4),
-          ),
-        ],
-      ),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 16),
-        child: Row(
-          children: [
-            CircleAvatar(
-              radius: 28,
-              backgroundColor: color.withOpacity(0.1),
-              child: Icon(icon, color: color, size: 32),
-            ),
-            const SizedBox(width: 20),
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  value,
-                  style: TextStyle(
-                    fontSize: 28,
-                    fontWeight: FontWeight.bold,
-                    color: color,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  title,
-                  style: const TextStyle(
-                    fontSize: 16,
-                    color: Colors.black54,
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
-              ],
             ),
           ],
         ),
@@ -191,24 +202,85 @@ class _DashboardScreenState extends State<DashboardScreen>
     );
   }
 
-  /// 🔹 Animation de transition vers l’écran d’ajout de livre
+  /// 🧩 Carte statistique
+  Widget _buildStatCard(String label, String value, IconData icon, Color color) {
+    return Expanded(
+      child: Container(
+        margin: const EdgeInsets.symmetric(horizontal: 4),
+        padding: const EdgeInsets.symmetric(vertical: 20),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(16),
+          boxShadow: [
+            BoxShadow(
+              color: color.withOpacity(0.15),
+              blurRadius: 8,
+              offset: const Offset(0, 4),
+            ),
+          ],
+        ),
+        child: Column(
+          children: [
+            Icon(icon, size: 30, color: color),
+            const SizedBox(height: 8),
+            Text(
+              value,
+              style: TextStyle(
+                fontSize: 22,
+                fontWeight: FontWeight.bold,
+                color: color,
+              ),
+            ),
+            Text(
+              label,
+              style: const TextStyle(fontSize: 14, color: Colors.black54),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// 🧭 Boutons d’action rapide
+  Widget _buildQuickAction({
+    required IconData icon,
+    required String label,
+    required Color color,
+    required VoidCallback onTap,
+  }) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Column(
+        children: [
+          CircleAvatar(
+            radius: 32,
+            backgroundColor: color.withOpacity(0.1),
+            child: Icon(icon, color: color, size: 30),
+          ),
+          const SizedBox(height: 6),
+          Text(
+            label,
+            style: TextStyle(
+              color: Colors.grey[800],
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// 🪄 Animation de transition vers la liste des livres
   Route _createRoute() {
     return PageRouteBuilder(
       pageBuilder: (context, animation, secondaryAnimation) =>
-      const BookScreen(),
+      const BookListPage(),
       transitionsBuilder: (context, animation, secondaryAnimation, child) {
         const begin = Offset(0.0, 1.0);
         const end = Offset.zero;
-        const curve = Curves.easeOutCubic;
-
-        final tween = Tween(begin: begin, end: end)
-            .chain(CurveTween(curve: curve));
-        final opacity = Tween<double>(begin: 0, end: 1).animate(animation);
-
-        return SlideTransition(
-          position: animation.drive(tween),
-          child: FadeTransition(opacity: opacity, child: child),
-        );
+        final tween =
+        Tween(begin: begin, end: end).chain(CurveTween(curve: Curves.easeOut));
+        return SlideTransition(position: animation.drive(tween), child: child);
       },
     );
   }
