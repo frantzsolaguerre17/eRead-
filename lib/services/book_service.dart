@@ -1,5 +1,4 @@
 import 'package:supabase_flutter/supabase_flutter.dart';
-
 import '../models/book.dart';
 
 class BookService {
@@ -10,20 +9,100 @@ class BookService {
     await supabase.from('book').insert(book.toJson());
   }
 
-  /// 🔹 Récupérer tous les livres
-  Future<List<Book>> getBooks() async {
-    final response = await supabase.from('book').select('*').order('created_at', ascending: false);
+  /// 🔹 Récupérer tous les livres (sans username)
+  Future<List<Book>> fetchBooks() async {
+    final response = await supabase
+        .from('book')
+        .select('*')                     // juste les colonnes de book
+        .order('created_at', ascending: false);
+
+    if (response == null) return [];
 
     return (response as List<dynamic>)
-        .map((data) => Book.fromJson(data as Map<String, dynamic>))
+        .map((json) => Book.fromJson(json as Map<String, dynamic>))
         .toList();
   }
 
-  /// 🔹 Récupérer les livres d’un utilisateur spécifique
+  /// 🔹 Récupérer les livres d’un utilisateur spécifique (sans username)
   Future<List<Book>> getBooksByUser(String userId) async {
-    final response = await supabase.from('book').select('*').eq('user_id', userId);
+    final response = await supabase
+        .from('book')
+        .select('*')                    // juste les colonnes de book
+        .eq('user_id', userId);
+
+    if (response == null) return [];
+
     return (response as List<dynamic>)
         .map((data) => Book.fromJson(data as Map<String, dynamic>))
         .toList();
   }
+
+
+  /// 🔹 Ajouter en favoris
+  Future<void> addFavorite(String bookId) async {
+    final user = Supabase.instance.client.auth.currentUser;
+    if (user == null) return;
+
+    await supabase.from('favorites').insert({
+      'user_id': user.id,
+      'book_id': bookId,
+    });
+  }
+
+  /// 🔹 Retirer des favoris
+  Future<void> removeFavorite(String bookId) async {
+    final user = Supabase.instance.client.auth.currentUser;
+    if (user == null) return;
+
+    await supabase
+        .from('favorites')
+        .delete()
+        .eq('user_id', user.id)
+        .eq('book_id', bookId);
+  }
+
+  /// 🔹 Récupérer les favoris de l'utilisateur
+  Future<List<String>> getUserFavorites() async {
+    final user = Supabase.instance.client.auth.currentUser;
+    if (user == null) return [];
+
+    final res = await supabase
+        .from('favorites')
+        .select('book_id')
+        .eq('user_id', user.id);
+
+    return (res as List).map((e) => e['book_id'] as String).toList();
+  }
+
+
+  Future<List<Book>> fetchFavoriteBooks() async {
+    final user = Supabase.instance.client.auth.currentUser;
+    if (user == null) return [];
+
+    // 1️⃣ Récupérer les IDs des favoris
+    final favRes = await supabase
+        .from('favorites')
+        .select('book_id')
+        .eq('user_id', user.id);
+
+    final List<String> favIds = (favRes as List)
+        .map((e) => e['book_id'] as String)
+        .toList();
+
+    if (favIds.isEmpty) return [];
+
+    // 2️⃣ Récupérer les livres correspondants correctement
+    final booksRes = await supabase
+        .from('book')
+        .select('*')
+        .filter('id', 'in', favIds); // ✅ passe directement la List<String>
+
+    return (booksRes as List)
+        .map((json) => Book.fromJson(json as Map<String, dynamic>))
+        .toList();
+  }
+
+
+
+
 }

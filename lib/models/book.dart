@@ -1,5 +1,4 @@
 class Book {
-  // 🔒 Attributs privés
   String _id;
   String _title;
   String _author;
@@ -9,9 +8,9 @@ class Book {
   String _cover;
   String _pdf;
   String _userId;
-  String _category; // 🆕 Nouvelle variable
+  String _category;
+  String? _userName;
 
-  // 🧱 Constructeur
   Book({
     required String id,
     required String title,
@@ -22,7 +21,8 @@ class Book {
     required String cover,
     required String pdf,
     required String userId,
-    required String category, // 🆕 Ajout dans le constructeur
+    required String category,
+    String? userName,
   })  : _id = id,
         _title = title,
         _author = author,
@@ -32,47 +32,29 @@ class Book {
         _cover = cover,
         _pdf = pdf,
         _userId = userId,
-        _category = category; // 🆕
+        _category = category,
+        _userName = userName;
 
-  // 🧩 Getters
-  String get id => _id;
-  String get title => _title;
-  String get author => _author;
-  String get number_of_pages => _number_of_pages;
-  DateTime get createdAt => _createdAt;
-  bool get isSynced => _isSynced;
-  String get cover => _cover;
-  String get pdf => _pdf;
-  String get userId => _userId;
-  String get category => _category; // 🆕
-
-  // ✏️ Setters
-  set title(String value) => _title = value;
-  set author(String value) => _author = value;
-  set number_of_pages(String value) => _number_of_pages = value;
-  set isSynced(bool value) => _isSynced = value;
-  set cover(String value) => _cover = value;
-  set pdf(String value) => _pdf = value;
-  set userId(String value) => _userId = value;
-  set category(String value) => _category = value; // 🆕
-
-  // 🔁 Convertir depuis JSON (pour lecture depuis Supabase)
+  // 🔁 FROM JSON — version safe
   factory Book.fromJson(Map<String, dynamic> json) {
     return Book(
-      id: json['id'] as String,
-      title: json['title'] as String,
-      author: json['author'] as String,
-      number_of_pages: json['number_of_pages'].toString(),
-      createdAt: DateTime.parse(json['created_at']), // ✅ conversion correcte
-      isSynced: json['isSynced'] as bool,
-      cover: json['cover'] as String,
-      pdf: json['pdf'] as String,
-      userId: json['user_id'] as String,
-      category: json['category'] as String? ?? 'Autre', // 🆕 valeur par défaut
+      id: json['id']?.toString() ?? "",
+      title: json['title']?.toString() ?? "",
+      author: json['author']?.toString() ?? "",
+      number_of_pages: json['number_of_pages']?.toString() ?? "",
+      createdAt: json['created_at'] != null
+          ? DateTime.parse(json['created_at'])
+          : DateTime.now(),
+      isSynced: json['isSynced'] ?? false,
+      cover: json['cover']?.toString() ?? "",
+      pdf: json['pdf']?.toString() ?? "",
+      userId: json['user_id']?.toString() ?? "",
+      category: json['category']?.toString() ?? "Autre",
+      userName: json['user_name']?.toString() ?? "Inconnu",
     );
   }
 
-  // 🔁 Convertir vers JSON (pour insertion dans Supabase)
+  // 🔁 TO JSON
   Map<String, dynamic> toJson() {
     return {
       'id': _id,
@@ -84,7 +66,32 @@ class Book {
       'cover': _cover,
       'pdf': _pdf,
       'user_id': _userId,
-      'category': _category, // 🆕
+      'category': _category,
+      'user_name': _userName,
     };
   }
+
+  // Getters
+  String get id => _id;
+  String get title => _title;
+  String get author => _author;
+  String get number_of_pages => _number_of_pages;
+  DateTime get createdAt => _createdAt;
+  bool get isSynced => _isSynced;
+  String get cover => _cover;
+  String get pdf => _pdf;
+  String get userId => _userId;
+  String get category => _category;
+  String? get userName => _userName;
+
+  // Setters
+  set title(String value) => _title = value;
+  set author(String value) => _author = value;
+  set number_of_pages(String value) => _number_of_pages = value;
+  set isSynced(bool value) => _isSynced = value;
+  set cover(String value) => _cover = value;
+  set pdf(String value) => _pdf = value;
+  set userId(String value) => _userId = value;
+  set category(String value) => _category = value;
+  set userName(String? value) => _userName = value;
 }

@@ -8,6 +8,7 @@ import '../controllers/ChapterController.dart';
 import '../controllers/ExcerptController.dart';
 import '../controllers/vocabulary_controller.dart';
 import '../models/book.dart';
+import '../models/excerpt.dart';
 import '../models/vocabulary.dart';
 import 'vocabulary_list_screen.dart';
 
@@ -38,7 +39,7 @@ class _BookDetailScreenState extends State<BookDetailScreen> {
     await vocabController.fetchVocabulary(widget.book.id);
   }
 
-  // ==================== DIALOGUES avec nouveau design ====================
+  // ==================== DIALOGUES STYLÉS ====================
 
   Future<void> _showStyledDialog({
     required String title,
@@ -183,6 +184,49 @@ class _BookDetailScreenState extends State<BookDetailScreen> {
     );
   }
 
+  void _editExcerptDialog(Excerpt ex) {
+    final contentController = TextEditingController(text: ex.content);
+    final commentController = TextEditingController(text: ex.comment);
+
+    _showStyledDialog(
+      title: "Modifier l'extrait ✍️",
+      content: Column(
+        children: [
+          TextField(
+            controller: contentController,
+            decoration: const InputDecoration(
+              labelText: "Texte de l'extrait",
+              prefixIcon: Icon(Icons.format_quote),
+            ),
+            maxLines: 3,
+          ),
+          const SizedBox(height: 10),
+          TextField(
+            controller: commentController,
+            decoration: const InputDecoration(
+              labelText: "Commentaire (optionnel)",
+              prefixIcon: Icon(Icons.comment),
+            ),
+            maxLines: 2,
+          ),
+        ],
+      ),
+      onConfirm: () async {
+        final content = contentController.text.trim();
+        if (content.isEmpty) return;
+
+        await context.read<ExcerptController>().updateExcerpt(
+          ex.id,
+          content,
+          commentController.text.trim(),
+        );
+
+        await context.read<ExcerptController>().fetchExcerpts(ex.chapterId);
+        if (mounted) Navigator.pop(context);
+      },
+    );
+  }
+
   void _addVocabularyDialog() {
     final wordController = TextEditingController();
     final definitionController = TextEditingController();
@@ -244,7 +288,7 @@ class _BookDetailScreenState extends State<BookDetailScreen> {
     );
   }
 
-  // ==================== AFFICHAGE ====================
+  // ==================== AFFICHAGE DES EXTRAITS ====================
 
   Widget _buildExcerpts(String chapterId) {
     final excerptController = context.watch<ExcerptController>();
@@ -266,17 +310,75 @@ class _BookDetailScreenState extends State<BookDetailScreen> {
 
     return Column(
       children: excerpts.map((ex) {
-        return Card(
-          margin: const EdgeInsets.symmetric(vertical: 6, horizontal: 10),
-          shape:
-          RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-          elevation: 3,
-          child: ListTile(
-            tileColor: Colors.deepPurple.shade50,
-            title: Text(ex.content, style: const TextStyle(fontSize: 16)),
-            subtitle: (ex.comment?.isNotEmpty ?? false)
-                ? Text("💬 ${ex.comment}")
-                : null,
+        return Dismissible(
+          key: Key(ex.id),
+          background: Container(
+            alignment: Alignment.centerLeft,
+            padding: const EdgeInsets.symmetric(horizontal: 20),
+            decoration: BoxDecoration(
+              color: Colors.green.shade400,
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: const Icon(Icons.edit, color: Colors.white),
+          ),
+          secondaryBackground: Container(
+            alignment: Alignment.centerRight,
+            padding: const EdgeInsets.symmetric(horizontal: 20),
+            decoration: BoxDecoration(
+              color: Colors.redAccent.shade400,
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: const Icon(Icons.delete, color: Colors.white),
+          ),
+          confirmDismiss: (direction) async {
+            if (direction == DismissDirection.endToStart) {
+              // Supprimer
+              return await showDialog(
+                context: context,
+                builder: (_) => AlertDialog(
+                  title: const Text("Supprimer l'extrait"),
+                  content: const Text("Voulez-vous vraiment supprimer cet extrait ?"),
+                  actions: [
+                    TextButton(
+                      onPressed: () => Navigator.of(context).pop(false),
+                      child: const Text("Annuler"),
+                    ),
+                    ElevatedButton(
+                      style: ElevatedButton.styleFrom(backgroundColor: Colors.redAccent),
+                      onPressed: () => Navigator.of(context).pop(true),
+                      child: const Text("Supprimer", style: TextStyle(color: Colors.white)),
+                    ),
+                  ],
+                ),
+              );
+            } else {
+              // Éditer
+              _editExcerptDialog(ex);
+              return false;
+            }
+          },
+          onDismissed: (direction) async {
+            if (direction == DismissDirection.endToStart) {
+              await excerptController.deleteExcerpt(ex.id);
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content: Text("Extrait supprimé ❌"),
+                  duration: Duration(seconds: 2),
+                ),
+              );
+            }
+          },
+          child: Card(
+            margin: const EdgeInsets.symmetric(vertical: 6, horizontal: 10),
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+            elevation: 3,
+            child: ListTile(
+              tileColor: Colors.deepPurple.shade50,
+              title: Text(ex.content, style: const TextStyle(fontSize: 16)),
+              subtitle: (ex.comment?.isNotEmpty ?? false)
+                  ? Text("💬 ${ex.comment}")
+                  : null,
+            ),
           ),
         );
       }).toList(),
@@ -375,8 +477,6 @@ class _BookDetailScreenState extends State<BookDetailScreen> {
           ),
         ),
       ),
-
-      // reste inchangé
       floatingActionButtonLocation: FloatingActionButtonLocation.centerFloat,
       floatingActionButton: Padding(
         padding: const EdgeInsets.only(bottom: 10),

@@ -5,6 +5,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 class ExcerptController extends ChangeNotifier {
   final ExcerptService _service = ExcerptService();
+  final SupabaseClient supabase = Supabase.instance.client;
 
   Map<String, List<Excerpt>> _excerpts = {};
   bool isLoading = false;
@@ -56,4 +57,36 @@ class ExcerptController extends ChangeNotifier {
       throw Exception('Erreur insertion extrait');
     }
   }
+
+
+  Future<void> updateExcerpt(String id, String content, String? comment) async {
+    final response = await supabase
+        .from('excerpts')
+        .update({'content': content, 'comment': comment})
+        .eq('id', id)
+        .select();
+
+    if (response != null && response.isNotEmpty) {
+      // Mettre à jour localement
+      _excerpts.forEach((chapterId, excerpts) {
+        final index = excerpts.indexWhere((ex) => ex.id == id);
+        if (index != -1) {
+          excerpts[index].content = content;
+          excerpts[index].comment = comment;
+        }
+      });
+      notifyListeners();
+    }
+  }
+
+
+  Future<void> deleteExcerpt(String id) async {
+    await supabase.from('excerpts').delete().eq('id', id);
+
+    _excerpts.forEach((chapterId, excerpts) {
+      excerpts.removeWhere((ex) => ex.id == id);
+    });
+    notifyListeners();
+  }
+
 }

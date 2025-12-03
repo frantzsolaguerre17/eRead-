@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import '../models/vocabulary.dart';
 import '../services/vocabulary_service.dart';
 
 class VocabularyController extends ChangeNotifier {
   final VocabularyService service = VocabularyService();
+  final SupabaseClient supabase = Supabase.instance.client;
 
   List<Vocabulary> _vocabularies = [];
   bool isLoading = false;
@@ -26,6 +28,7 @@ class VocabularyController extends ChangeNotifier {
     }
   }
 
+
   /// Ajouter un vocabulaire dans Supabase et mettre à jour la liste locale
   Future<void> addVocabulary(Vocabulary vocab) async {
     try {
@@ -37,4 +40,43 @@ class VocabularyController extends ChangeNotifier {
       throw Exception('Erreur insertion vocabulary');
     }
   }
+
+
+  Future<Vocabulary> updateVocabulary(Vocabulary vocab) async {
+    final data = await supabase
+        .from('vocabulary')
+        .update({
+      'word': vocab.word,
+      'definition': vocab.definition,
+      'example': vocab.example,
+    })
+        .eq('id', vocab.id)
+        .select()
+        .single();
+
+    return Vocabulary.fromJson(data);
+  }
+
+
+  Future<void> deleteVocabulary(String vocabId) async {
+    await supabase
+        .from('vocabulary')
+        .delete()
+        .eq('id', vocabId);
+  }
+
+
+
+  Future<int> getLearnedWordsCount() async {
+    final userId = Supabase.instance.client.auth.currentUser!.id;
+    final res = await supabase
+        .from('vocabulary')
+        .select('*')
+        .eq('user_id', userId)
+        .count();               // <-- utiliser .count() ici
+
+    return res.count ?? 0;
+  }
+
+
 }

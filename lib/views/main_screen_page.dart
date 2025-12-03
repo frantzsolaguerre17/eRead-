@@ -2,7 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../controllers/book_controller.dart';
+import '../controllers/vocabulary_controller.dart';
 import '../views/book_screen.dart';
+import 'favorites_book_page.dart';
 
 class DashboardScreen extends StatefulWidget {
   const DashboardScreen({super.key});
@@ -17,21 +19,28 @@ class _DashboardScreenState extends State<DashboardScreen>
   late AnimationController _controller;
   late Animation<double> _fadeAnim;
   String displayName = 'Utilisateur';
+  late final VocabularyController vocabularyController = VocabularyController();
+
+  //late VocabularyController vocabularyController;
 
   @override
   void initState() {
     super.initState();
+    //vocabularyController = VocabularyController();
     _loadDisplayName();
+
     _controller = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 800),
     );
+
     _fadeAnim = CurvedAnimation(parent: _controller, curve: Curves.easeInOut);
     _controller.forward();
   }
 
   void _loadDisplayName() {
     final user = supabase.auth.currentUser;
+
     if (user != null) {
       setState(() {
         displayName = user.userMetadata?['full_name'] ?? 'Utilisateur';
@@ -55,41 +64,70 @@ class _DashboardScreenState extends State<DashboardScreen>
         opacity: _fadeAnim,
         child: CustomScrollView(
           slivers: [
-            // 🧢 AppBar en dégradé DeepPurple
             SliverAppBar(
               backgroundColor: Colors.deepPurple.shade700,
-              expandedHeight: 170,
+              expandedHeight: 190,
               floating: false,
               pinned: true,
+              elevation: 2,
               flexibleSpace: FlexibleSpaceBar(
-                title: const Text(
-                  "eRead",
-                  style: TextStyle(
-                    fontWeight: FontWeight.bold,
-                    color: Colors.white,
-                  ),
-                ),
-                background: Container(
-                  decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      colors: [Colors.deepPurple.shade700, Colors.deepPurple.shade400],
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
+                centerTitle: true,
+                titlePadding: const EdgeInsets.only(bottom: 16),
+                title: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Hero(
+                      tag: "app_logo",
+                      child: ClipRRect(
+                        borderRadius: BorderRadius.circular(50),
+                        child: Image.asset(
+                          "assets/images/default_image.png",
+                          height: 30,
+                          width: 30,
+                          fit: BoxFit.cover,
+                        ),
+                      ),
                     ),
-                  ),
+                    const SizedBox(width: 8),
+                    const Text(
+                      "eRead",
+                      style: TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 19,
+                        color: Colors.white,
+                      ),
+                    ),
+                  ],
+                ),
+                background: Stack(
+                  fit: StackFit.expand,
+                  children: [
+                    Image.asset(
+                      "assets/images/default_image.png",
+                      fit: BoxFit.cover,
+                    ),
+                    Container(
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          colors: [
+                            Colors.black.withOpacity(0.5),
+                            Colors.transparent,
+                          ],
+                          begin: Alignment.bottomCenter,
+                          end: Alignment.topCenter,
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
               ),
-              elevation: 2,
             ),
-
-            // 🌿 Contenu principal
             SliverToBoxAdapter(
               child: Padding(
                 padding: const EdgeInsets.all(20.0),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    // 👋 Section Bonjour
                     Text(
                       "Bonjour, $displayName 👋",
                       style: const TextStyle(
@@ -101,16 +139,17 @@ class _DashboardScreenState extends State<DashboardScreen>
                     const SizedBox(height: 8),
                     Text(
                       "Prêt à lire quelque chose d'inspirant aujourd’hui ?",
-                      style: TextStyle(color: Colors.grey[600], fontSize: 16),
+                      style: TextStyle(
+                        color: Colors.grey[600],
+                        fontSize: 16,
+                      ),
                     ),
                     const SizedBox(height: 25),
-
-                    // 📊 Statistiques
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
                         _buildStatCard(
-                          "Livres",
+                          "Favoris Livres",
                           "${bookController.books.length}",
                           Icons.menu_book_rounded,
                           Colors.deepPurple,
@@ -121,18 +160,27 @@ class _DashboardScreenState extends State<DashboardScreen>
                           Icons.favorite,
                           Colors.redAccent,
                         ),
-                        _buildStatCard(
-                          "Mots appris",
-                          "0",
-                          Icons.text_fields,
-                          Colors.amber,
+                        // ✅ Compteur mots appris avec FutureBuilder
+                        FutureBuilder<int>(
+                          future: vocabularyController.getLearnedWordsCount(),
+                          builder: (context, snapshot) {
+                            String value = "0";
+                            if (snapshot.connectionState == ConnectionState.waiting) {
+                              value = "...";
+                            } else if (snapshot.hasData) {
+                              value = snapshot.data.toString();
+                            }
+                            return _buildStatCard(
+                              "Mots appris",
+                              value,
+                              Icons.text_fields,
+                              Colors.amber,
+                            );
+                          },
                         ),
                       ],
                     ),
-
                     const SizedBox(height: 40),
-
-                    // ⚡ Accès rapide
                     Text(
                       "Accès rapide",
                       style: TextStyle(
@@ -142,14 +190,12 @@ class _DashboardScreenState extends State<DashboardScreen>
                       ),
                     ),
                     const SizedBox(height: 20),
-
-                    // 🎯 Icônes de navigation
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceAround,
                       children: [
                         _buildQuickAction(
                           icon: Icons.book_rounded,
-                          label: "Mes livres",
+                          label: "Livres",
                           color: Colors.deepPurple,
                           onTap: () => Navigator.of(context).push(_createRoute()),
                         ),
@@ -157,7 +203,8 @@ class _DashboardScreenState extends State<DashboardScreen>
                           icon: Icons.star_border_rounded,
                           label: "Favoris",
                           color: Colors.deepPurple.shade300,
-                          onTap: () {},
+                          onTap: () =>
+                              Navigator.of(context).push(_createRouteFavoritePage()),
                         ),
                         _buildQuickAction(
                           icon: Icons.person_outline,
@@ -177,7 +224,6 @@ class _DashboardScreenState extends State<DashboardScreen>
     );
   }
 
-  /// 🧩 Carte statistique
   Widget _buildStatCard(String label, String value, IconData icon, Color color) {
     return Expanded(
       child: Container(
@@ -206,17 +252,13 @@ class _DashboardScreenState extends State<DashboardScreen>
                 color: color,
               ),
             ),
-            Text(
-              label,
-              style: const TextStyle(fontSize: 14, color: Colors.black54),
-            ),
+            Text(label, style: const TextStyle(fontSize: 14)),
           ],
         ),
       ),
     );
   }
 
-  /// 🧭 Boutons d’action rapide
   Widget _buildQuickAction({
     required IconData icon,
     required String label,
@@ -245,11 +287,24 @@ class _DashboardScreenState extends State<DashboardScreen>
     );
   }
 
-  /// 🪄 Animation de transition vers la liste des livres
   Route _createRoute() {
     return PageRouteBuilder(
       pageBuilder: (context, animation, secondaryAnimation) =>
       const BookListPage(),
+      transitionsBuilder: (context, animation, secondaryAnimation, child) {
+        const begin = Offset(0.0, 1.0);
+        const end = Offset.zero;
+        final tween =
+        Tween(begin: begin, end: end).chain(CurveTween(curve: Curves.easeOut));
+        return SlideTransition(position: animation.drive(tween), child: child);
+      },
+    );
+  }
+
+  Route _createRouteFavoritePage() {
+    return PageRouteBuilder(
+      pageBuilder: (context, animation, secondaryAnimation) =>
+      const FavoriteBooksPage(),
       transitionsBuilder: (context, animation, secondaryAnimation, child) {
         const begin = Offset(0.0, 1.0);
         const end = Offset.zero;

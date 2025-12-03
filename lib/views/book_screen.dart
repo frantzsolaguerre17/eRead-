@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:shimmer/shimmer.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
 import '../models/book.dart';
 import '../services/book_service.dart';
 import 'AddBook_page.dart';
 import 'pdf_viewer_page.dart';
+import 'favorites_book_page.dart';
 
 class BookListPage extends StatefulWidget {
   const BookListPage({super.key});
@@ -19,9 +19,10 @@ class _BookListPageState extends State<BookListPage> {
   List<String> categories = ['Toutes'];
   String selectedCategory = 'Toutes';
   String displayName = 'Utilisateur';
-  final supabase = Supabase.instance.client;
   bool isLoading = true;
   String searchQuery = '';
+
+  final TextEditingController _searchController = TextEditingController();
 
   @override
   void initState() {
@@ -36,10 +37,8 @@ class _BookListPageState extends State<BookListPage> {
 
   Future<void> _loadBooks() async {
     setState(() => isLoading = true);
-    final data = await BookService().getBooks();
-    await Future.delayed(const Duration(seconds: 1));
-
-    // Extraire les catégories uniques
+    final data = await BookService().fetchBooks();
+    await Future.delayed(const Duration(milliseconds: 500));
     final allCategories = data.map((b) => b.category).where((c) => c.isNotEmpty).toSet().toList();
 
     setState(() {
@@ -51,7 +50,7 @@ class _BookListPageState extends State<BookListPage> {
   }
 
   void _loadDisplayName() {
-    final user = supabase.auth.currentUser;
+    final user = BookService().supabase.auth.currentUser;
     if (user != null) {
       setState(() {
         displayName = user.userMetadata?['full_name'] ?? 'Utilisateur';
@@ -115,11 +114,24 @@ class _BookListPageState extends State<BookListPage> {
             children: [
               const SizedBox(height: 8),
               TextField(
+                controller: _searchController,
                 onChanged: _filterBooks,
                 decoration: InputDecoration(
                   hintText: "Rechercher un livre...",
                   hintStyle: const TextStyle(color: Colors.white70),
                   prefixIcon: const Icon(Icons.search, color: Colors.white70),
+                  suffixIcon: searchQuery.isNotEmpty
+                      ? IconButton(
+                    icon: const Icon(Icons.close, color: Colors.white70),
+                    onPressed: () {
+                      setState(() {
+                        searchQuery = '';
+                        _searchController.clear();
+                      });
+                      _filterBooks('');
+                    },
+                  )
+                      : null,
                   filled: true,
                   fillColor: Colors.deepPurple.shade600,
                   contentPadding: const EdgeInsets.symmetric(vertical: 0, horizontal: 16),
@@ -138,13 +150,23 @@ class _BookListPageState extends State<BookListPage> {
               bottom: Radius.circular(20),
             ),
           ),
+          actions: [
+            IconButton(
+              icon: const Icon(Icons.favorite, color: Colors.redAccent),
+              onPressed: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => const FavoriteBooksPage()),
+                );
+              },
+            )
+          ],
         ),
       ),
       body: isLoading
           ? const BookListShimmer()
           : Column(
         children: [
-          // === Dropdown pour filtrer par catégorie ===
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
             child: Container(
@@ -161,34 +183,28 @@ class _BookListPageState extends State<BookListPage> {
                 icon: const Icon(Icons.arrow_drop_down, color: Colors.deepPurple),
                 style: const TextStyle(color: Colors.black87, fontSize: 16),
                 dropdownColor: Colors.deepPurple.shade50,
-                items: categories.map((String category) {
-                  return DropdownMenuItem<String>(
-                    value: category,
-                    child: Text(category),
-                  );
-                }).toList(),
+                items: categories.map((category) => DropdownMenuItem(
+                  value: category,
+                  child: Text(category),
+                )).toList(),
                 onChanged: (value) {
                   if (value != null) _filterByCategory(value);
                 },
               ),
             ),
           ),
-
-          // === Liste des livres ===
           Expanded(
             child: filteredBooks.isEmpty
                 ? const Center(
-              child: Text(
-                "Aucun livre trouvé.",
-                style: TextStyle(fontSize: 16, color: Colors.grey),
-              ),
+              child: Text("Aucun livre trouvé.",
+                  style: TextStyle(fontSize: 16, color: Colors.grey)),
             )
                 : ListView.builder(
               padding: const EdgeInsets.all(12),
               itemCount: filteredBooks.length,
               itemBuilder: (context, index) {
                 final book = filteredBooks[index];
-                return _ModernBookCard(book: book, displayName: displayName);
+                return ModernBookCard(book: book);
               },
             ),
           ),
@@ -214,7 +230,6 @@ class _BookListPageState extends State<BookListPage> {
 // =================== Shimmer Loader ===================
 class BookListShimmer extends StatelessWidget {
   const BookListShimmer({super.key});
-
   @override
   Widget build(BuildContext context) {
     return ListView.builder(
@@ -243,21 +258,48 @@ class BookListShimmer extends StatelessWidget {
   }
 }
 
-// =================== Carte moderne pour chaque livre ===================
-class _ModernBookCard extends StatelessWidget {
+// ================= ModernBookCard avec favoris à droite =================
+class ModernBookCard extends StatefulWidget {
   final Book book;
-  final String displayName;
+  const ModernBookCard({required this.book});
 
-  const _ModernBookCard({required this.book, required this.displayName});
+  @override
+  State<ModernBookCard> createState() => _ModernBookCardState();
+}
+
+class _ModernBookCardState extends State<ModernBookCard> {
+  bool isFavorite = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadFavoriteStatus();
+  }
+
+  Future<void> _loadFavoriteStatus() async {
+    final favorites = await BookService().getUserFavorites();
+    setState(() {
+      isFavorite = favorites.contains(widget.book.id);
+    });
+  }
+
+  Future<void> _toggleFavorite() async {
+    if (isFavorite) {
+      await BookService().removeFavorite(widget.book.id);
+    } else {
+      await BookService().addFavorite(widget.book.id);
+    }
+    setState(() => isFavorite = !isFavorite);
+  }
 
   @override
   Widget build(BuildContext context) {
     return GestureDetector(
       onTap: () {
-        if (book.pdf.isNotEmpty) {
+        if (widget.book.pdf.isNotEmpty) {
           Navigator.push(
             context,
-            MaterialPageRoute(builder: (_) => PdfViewerPage(book: book)),
+            MaterialPageRoute(builder: (_) => PdfViewerPage(book: widget.book)),
           );
         } else {
           ScaffoldMessenger.of(context).showSnackBar(
@@ -281,26 +323,21 @@ class _ModernBookCard extends StatelessWidget {
           ),
           child: Row(
             children: [
+              // Image du livre
               ClipRRect(
                 borderRadius: const BorderRadius.only(
-                  topLeft: Radius.circular(20),
-                  bottomLeft: Radius.circular(20),
-                ),
-                child: book.cover.isNotEmpty
+                    topLeft: Radius.circular(20), bottomLeft: Radius.circular(20)),
+                child: widget.book.cover.isNotEmpty
                     ? Image.network(
-                  book.cover,
+                  widget.book.cover,
                   width: 120,
                   height: 140,
                   fit: BoxFit.cover,
                   errorBuilder: (context, error, stackTrace) {
-                   /* return Container(
-                      width: 120,
-                      height: 140,
-                      color: Colors.grey.shade300,
-                      child: const Icon(Icons.broken_image, size: 50),
-                    );*/
-                    return
-                    Image.asset("assets/images/default_image.png", fit: BoxFit.cover);
+                    return Image.asset(
+                      "assets/images/default_image.png",
+                      fit: BoxFit.cover,
+                    );
                   },
                 )
                     : Container(
@@ -310,34 +347,47 @@ class _ModernBookCard extends StatelessWidget {
                   child: const Icon(Icons.book, size: 50),
                 ),
               ),
+              // Contenu texte + bouton favoris
               Expanded(
                 child: Padding(
                   padding: const EdgeInsets.all(14),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
+                  child: Stack(
                     children: [
-                      Text(
-                        book.title,
-                        style: const TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.bold,
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            widget.book.title,
+                            style: const TextStyle(
+                                fontSize: 18, fontWeight: FontWeight.bold),
+                          ),
+                          const SizedBox(height: 4),
+                          Text("Auteur : ${widget.book.author}",
+                              style: TextStyle(color: Colors.grey.shade700)),
+                          const SizedBox(height: 2),
+                          Text("Pages : ${widget.book.number_of_pages}",
+                              style: TextStyle(color: Colors.grey.shade700)),
+                          const SizedBox(height: 2),
+                          Text("Catégorie : ${widget.book.category}",
+                              style: TextStyle(color: Colors.grey.shade700)),
+                          const SizedBox(height: 4),
+                          Text("Ajouté par : ${widget.book.userName}",
+                              style: TextStyle(
+                                  color: Colors.grey.shade800,
+                                  fontStyle: FontStyle.italic,
+                                  fontSize: 12)),
+                        ],
+                      ),
+                      Positioned(
+                        right: 0,
+                        top: 50,
+                        child: IconButton(
+                          icon: Icon(
+                              isFavorite ? Icons.favorite : Icons.favorite_border,
+                              color: Colors.red),
+                          onPressed: _toggleFavorite,
                         ),
                       ),
-                      const SizedBox(height: 4),
-                      Text("Auteur : ${book.author}",
-                          style: TextStyle(color: Colors.grey.shade700)),
-                      const SizedBox(height: 2),
-                      Text("Pages : ${book.number_of_pages}",
-                          style: TextStyle(color: Colors.grey.shade700)),
-                      const SizedBox(height: 2),
-                      Text("Catégorie : ${book.category}",
-                          style: TextStyle(color: Colors.grey.shade700)),
-                      const SizedBox(height: 4),
-                      Text("Ajouté par : $displayName",
-                          style: TextStyle(
-                              color: Colors.grey.shade800,
-                              fontStyle: FontStyle.italic,
-                              fontSize: 12)),
                     ],
                   ),
                 ),

@@ -186,10 +186,11 @@ class _AddBookPageState extends State<AddBookPage> {
         pdf: pdfUrl ?? '',
         userId: user.id,
         category: selectedCategory ?? 'Non définie',
+        userName: user.userMetadata?['username'] ?? 'Inconnu',
       );
 
       await supabase.from('book').insert(newBook.toJson());
-      await Provider.of<BookController>(context, listen: false).addBook(newBook);
+      await Provider.of<BookController>(context, listen: false).addBook(newBook, title: '', author: '');
 
       _showSnack("📘 Livre ajouté avec succès !");
       Navigator.pushReplacement(

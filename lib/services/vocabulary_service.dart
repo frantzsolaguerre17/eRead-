@@ -19,6 +19,7 @@ class VocabularyService {
     }
   }
 
+
   /// Récupérer tous les vocabulaires pour un livre
   Future<List<Vocabulary>> fetchVocabulary(String bookId) async {
     try {
@@ -40,4 +41,16 @@ class VocabularyService {
       throw Exception('Erreur fetchVocabulary : $e');
     }
   }
+
+
+  Future<bool> deleteVocabulary(String id) async {
+    final response = await supabase
+        .from('vocabulary')
+        .delete()
+        .eq('id', id)
+        .select(); // select to get returned rows if needed
+    // response can be [] meaning deleted; consider it success if no exception
+    return true;
+  }
+
 }
