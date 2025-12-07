@@ -8,6 +8,7 @@ class Vocabulary {
   String _bookId;
   bool _isSynced;
   String _userId;
+  bool _isFavorite;
 
   // 🧱 Constructeur
   Vocabulary({
@@ -19,6 +20,7 @@ class Vocabulary {
     required String bookId,
     required bool isSynced,
     required String userId,
+    required bool isFavorite, // Ajouter ici aussi
   })  : _id = id,
         _word = word,
         _definition = definition,
@@ -26,7 +28,8 @@ class Vocabulary {
         _createdAt = createdAt,
         _bookId = bookId,
         _isSynced = isSynced,
-        _userId = userId;
+        _userId = userId,
+        _isFavorite = isFavorite;
 
   // 🧩 Getters
   String get id => _id;
@@ -38,6 +41,8 @@ class Vocabulary {
   bool get isSynced => _isSynced;
   String get userId => _userId;
 
+  bool get isFavorite => _isFavorite; // ⭐ Getter
+
   // ✏️ Setters
   set word(String value) => _word = value;
   set definition(String value) => _definition = value;
@@ -46,6 +51,8 @@ class Vocabulary {
   set isSynced(bool value) => _isSynced = value;
   set userId(String value) => _userId = value;
 
+  set isFavorite(bool value) => _isFavorite = value; // ⭐ Setter
+
   // 🔁 Convertir depuis JSON (lecture depuis Supabase)
   factory Vocabulary.fromJson(Map<String, dynamic> json) {
     return Vocabulary(
@@ -53,13 +60,13 @@ class Vocabulary {
       word: json['word'] as String,
       definition: json['definition'] as String,
       example: json['example'],
-      createdAt: DateTime.parse(json['created_at'] as String), // ← conversion obligatoire
+      createdAt: DateTime.parse(json['created_at']),
       bookId: json['book_id'] as String,
       isSynced: json['isSynced'] as bool,
       userId: json['user_id'] as String,
+      isFavorite: json['is_favorite'] as bool? ?? false, // ⭐ Sécurisé
     );
   }
-
 
   // 🔁 Convertir vers JSON (insertion dans Supabase)
   Map<String, dynamic> toJson() {
@@ -72,6 +79,7 @@ class Vocabulary {
       'book_id': _bookId,
       'isSynced': _isSynced,
       'user_id': _userId,
+      'is_favorite': _isFavorite, // ⭐ Export favori
     };
   }
 }

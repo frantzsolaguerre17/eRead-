@@ -103,6 +103,45 @@ class BookService {
   }
 
 
+  /// Met à jour la progression et le flag is_read
+  Future<void> updateReadingProgress(String bookId, int progress, {bool? isRead}) async {
+    final payload = <String, dynamic>{
+      'reading_progress': progress, // progress doit être un int
+    };
+
+    if (isRead != null) {
+      payload['is_read'] = isRead; // bool, ok
+    }
+
+    await supabase
+        .from('book')
+        .update(payload)
+        .eq('id', bookId);
+  }
+
+
+  Future<int> getReadBooksCount() async {
+    final user = supabase.auth.currentUser;
+    if (user == null) return 0;
+
+    try {
+      final response = await supabase
+          .from('user_book_progress')
+          .select()
+          .eq('user_id', user.id)
+          .eq('is_read', true);
+
+      // response est une List
+      if (response is List) {
+        return response.length;
+      } else {
+        return 0;
+      }
+    } catch (e) {
+      print('Erreur getReadBooksCount: $e');
+      return 0;
+    }
+  }
 
 
 }

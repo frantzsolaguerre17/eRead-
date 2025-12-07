@@ -61,7 +61,7 @@ class ExcerptController extends ChangeNotifier {
 
   Future<void> updateExcerpt(String id, String content, String? comment) async {
     final response = await supabase
-        .from('excerpts')
+        .from('excerpt')
         .update({'content': content, 'comment': comment})
         .eq('id', id)
         .select();
@@ -80,12 +80,13 @@ class ExcerptController extends ChangeNotifier {
   }
 
 
-  Future<void> deleteExcerpt(String id) async {
-    await supabase.from('excerpts').delete().eq('id', id);
+  Future<void> deleteExcerpt(String id, String chapterId) async {
+    await supabase
+        .from('excerpt')
+        .delete()
+        .eq('id', id);
 
-    _excerpts.forEach((chapterId, excerpts) {
-      excerpts.removeWhere((ex) => ex.id == id);
-    });
+    _excerpts[chapterId]?.removeWhere((ex) => ex.id == id);
     notifyListeners();
   }
 

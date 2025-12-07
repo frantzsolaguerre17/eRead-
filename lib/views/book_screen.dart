@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:shimmer/shimmer.dart';
 import '../models/book.dart';
+import '../models/userBookProgress.dart';
 import '../services/book_service.dart';
 import 'AddBook_page.dart';
 import 'pdf_viewer_page.dart';
 import 'favorites_book_page.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 class BookListPage extends StatefulWidget {
   const BookListPage({super.key});
@@ -23,6 +25,7 @@ class _BookListPageState extends State<BookListPage> {
   String searchQuery = '';
 
   final TextEditingController _searchController = TextEditingController();
+  final supabase = Supabase.instance.client;
 
   @override
   void initState() {
@@ -50,7 +53,7 @@ class _BookListPageState extends State<BookListPage> {
   }
 
   void _loadDisplayName() {
-    final user = BookService().supabase.auth.currentUser;
+    final user = supabase.auth.currentUser;
     if (user != null) {
       setState(() {
         displayName = user.userMetadata?['full_name'] ?? 'Utilisateur';
@@ -183,10 +186,12 @@ class _BookListPageState extends State<BookListPage> {
                 icon: const Icon(Icons.arrow_drop_down, color: Colors.deepPurple),
                 style: const TextStyle(color: Colors.black87, fontSize: 16),
                 dropdownColor: Colors.deepPurple.shade50,
-                items: categories.map((category) => DropdownMenuItem(
+                items: categories
+                    .map((category) => DropdownMenuItem(
                   value: category,
                   child: Text(category),
-                )).toList(),
+                ))
+                    .toList(),
                 onChanged: (value) {
                   if (value != null) _filterByCategory(value);
                 },
@@ -244,7 +249,7 @@ class BookListShimmer extends StatelessWidget {
             child: Card(
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
               child: Container(
-                height: 140,
+                height: 160,
                 decoration: BoxDecoration(
                   color: Colors.deepPurple.shade50,
                   borderRadius: BorderRadius.circular(20),
@@ -258,10 +263,10 @@ class BookListShimmer extends StatelessWidget {
   }
 }
 
-// ================= ModernBookCard avec favoris à droite =================
+// ================= ModernBookCard avec badge sous le bouton favoris =================
 class ModernBookCard extends StatefulWidget {
   final Book book;
-  const ModernBookCard({required this.book});
+  const ModernBookCard({required this.book, super.key});
 
   @override
   State<ModernBookCard> createState() => _ModernBookCardState();
@@ -269,11 +274,14 @@ class ModernBookCard extends StatefulWidget {
 
 class _ModernBookCardState extends State<ModernBookCard> {
   bool isFavorite = false;
+  double progress = 0;
+  final supabase = Supabase.instance.client;
 
   @override
   void initState() {
     super.initState();
     _loadFavoriteStatus();
+    _loadProgress();
   }
 
   Future<void> _loadFavoriteStatus() async {
@@ -292,8 +300,38 @@ class _ModernBookCardState extends State<ModernBookCard> {
     setState(() => isFavorite = !isFavorite);
   }
 
+  Future<void> _loadProgress() async {
+    final user = supabase.auth.currentUser;
+    if (user == null) return;
+
+    final response = await supabase
+        .from('user_book_progress')
+        .select()
+        .eq('user_id', user.id)
+        .eq('book_id', widget.book.id)
+        .maybeSingle();
+
+    if (response != null) {
+      final progressData = UserBookProgress.fromMap(response);
+      setState(() {
+        progress = (progressData.readingProgress / 100).clamp(0.0, 1.0);
+      });
+    }
+  }
+
+  Color _getBadgeColor() {
+    if (progress >= 0.8) return Colors.green;
+    if (progress > 0) return Colors.blue;
+    return Colors.grey.shade400;
+  }
+
+  String _getBadgeText() {
+    return progress >= 0.8 ? "LU" : "${(progress * 100).round()}%";
+  }
+
   @override
   Widget build(BuildContext context) {
+    const double cardHeight = 160;
     return GestureDetector(
       onTap: () {
         if (widget.book.pdf.isNotEmpty) {
@@ -312,18 +350,11 @@ class _ModernBookCardState extends State<ModernBookCard> {
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
         elevation: 6,
         shadowColor: Colors.grey.shade300,
-        child: Container(
-          decoration: BoxDecoration(
-            gradient: LinearGradient(
-              colors: [Colors.deepPurple.shade50, Colors.deepPurple.shade100],
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-            ),
-            borderRadius: BorderRadius.circular(20),
-          ),
+        child: SizedBox(
+          height: cardHeight,
           child: Row(
             children: [
-              // Image du livre
+              // Image
               ClipRRect(
                 borderRadius: const BorderRadius.only(
                     topLeft: Radius.circular(20), bottomLeft: Radius.circular(20)),
@@ -331,61 +362,84 @@ class _ModernBookCardState extends State<ModernBookCard> {
                     ? Image.network(
                   widget.book.cover,
                   width: 120,
-                  height: 140,
+                  height: cardHeight,
                   fit: BoxFit.cover,
-                  errorBuilder: (context, error, stackTrace) {
-                    return Image.asset(
-                      "assets/images/default_image.png",
-                      fit: BoxFit.cover,
-                    );
-                  },
                 )
                     : Container(
                   width: 120,
-                  height: 140,
+                  height: cardHeight,
                   color: Colors.grey.shade300,
                   child: const Icon(Icons.book, size: 50),
                 ),
               ),
-              // Contenu texte + bouton favoris
+              // Texte + badges + favoris
               Expanded(
                 child: Padding(
-                  padding: const EdgeInsets.all(14),
+                  padding: const EdgeInsets.all(12),
                   child: Stack(
                     children: [
-                      Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            widget.book.title,
-                            style: const TextStyle(
-                                fontSize: 18, fontWeight: FontWeight.bold),
-                          ),
-                          const SizedBox(height: 4),
-                          Text("Auteur : ${widget.book.author}",
-                              style: TextStyle(color: Colors.grey.shade700)),
-                          const SizedBox(height: 2),
-                          Text("Pages : ${widget.book.number_of_pages}",
-                              style: TextStyle(color: Colors.grey.shade700)),
-                          const SizedBox(height: 2),
-                          Text("Catégorie : ${widget.book.category}",
-                              style: TextStyle(color: Colors.grey.shade700)),
-                          const SizedBox(height: 4),
-                          Text("Ajouté par : ${widget.book.userName}",
-                              style: TextStyle(
-                                  color: Colors.grey.shade800,
-                                  fontStyle: FontStyle.italic,
-                                  fontSize: 12)),
-                        ],
+                      SingleChildScrollView(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              widget.book.title,
+                              style: const TextStyle(
+                                  fontSize: 18, fontWeight: FontWeight.bold),
+                            ),
+                            const SizedBox(height: 4),
+                            Text("Auteur : ${widget.book.author}",
+                                style: TextStyle(color: Colors.grey.shade700)),
+                            const SizedBox(height: 2),
+                            Text("Pages : ${widget.book.number_of_pages}",
+                                style: TextStyle(color: Colors.grey.shade700)),
+                            const SizedBox(height: 2),
+                            Text("Catégorie : ${widget.book.category}",
+                                style: TextStyle(color: Colors.grey.shade700)),
+                            const SizedBox(height: 4),
+                            Text("Ajouté par : ${widget.book.userName}",
+                                style: TextStyle(
+                                    color: Colors.grey.shade800,
+                                    fontStyle: FontStyle.italic,
+                                    fontSize: 12)),
+                          /*  const SizedBox(height: 32), // espace pour badge
+                            LinearProgressIndicator(
+                              value: progress,
+                              minHeight: 6,
+                              backgroundColor: Colors.grey.shade300,
+                              color: progress >= 0.8
+                                  ? Colors.green
+                                  : Colors.deepPurple,
+                            ),*/
+                          ],
+                        ),
                       ),
                       Positioned(
                         right: 0,
-                        top: 50,
-                        child: IconButton(
-                          icon: Icon(
-                              isFavorite ? Icons.favorite : Icons.favorite_border,
-                              color: Colors.red),
-                          onPressed: _toggleFavorite,
+                        top: 37,
+                        child: Column(
+                          children: [
+                            IconButton(
+                              icon: Icon(
+                                  isFavorite ? Icons.favorite : Icons.favorite_border,
+                                  color: Colors.red),
+                              onPressed: _toggleFavorite,
+                            ),
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 10, vertical: 4),
+                              decoration: BoxDecoration(
+                                color: _getBadgeColor(),
+                                borderRadius: BorderRadius.circular(20),
+                              ),
+                              child: Text(
+                                _getBadgeText(),
+                                style: const TextStyle(
+                                    color: Colors.white,
+                                    fontWeight: FontWeight.bold),
+                              ),
+                            ),
+                          ],
                         ),
                       ),
                     ],

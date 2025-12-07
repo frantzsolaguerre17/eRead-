@@ -5,21 +5,20 @@ import '../services/vocabulary_service.dart';
 
 class VocabularyController extends ChangeNotifier {
   final VocabularyService service = VocabularyService();
-  final SupabaseClient supabase = Supabase.instance.client;
 
   List<Vocabulary> _vocabularies = [];
   bool isLoading = false;
 
   List<Vocabulary> get vocabularies => _vocabularies;
+  final SupabaseClient supabase = Supabase.instance.client;
 
-  /// Récupérer les vocabulaires depuis Supabase
+  /// 🔄 Récupérer les vocabulaires pour un livre
   Future<void> fetchVocabulary(String bookId) async {
     try {
       isLoading = true;
       notifyListeners();
 
-      final fetched = await service.fetchVocabulary(bookId);
-      _vocabularies = fetched;
+      _vocabularies = await service.fetchVocabulary(bookId);
     } catch (e) {
       debugPrint('Erreur fetchVocabulary : $e');
     } finally {
@@ -28,8 +27,7 @@ class VocabularyController extends ChangeNotifier {
     }
   }
 
-
-  /// Ajouter un vocabulaire dans Supabase et mettre à jour la liste locale
+  /// ➕ Ajouter
   Future<void> addVocabulary(Vocabulary vocab) async {
     try {
       final inserted = await service.addVocabulary(vocab);
@@ -41,41 +39,80 @@ class VocabularyController extends ChangeNotifier {
     }
   }
 
+  /// ✏️ Modifier
+  Future<void> updateVocabulary(Vocabulary vocab) async {
+    try {
+      await service.updateVocabulary(vocab);
 
-  Future<Vocabulary> updateVocabulary(Vocabulary vocab) async {
-    final data = await supabase
-        .from('vocabulary')
-        .update({
-      'word': vocab.word,
-      'definition': vocab.definition,
-      'example': vocab.example,
-    })
-        .eq('id', vocab.id)
-        .select()
-        .single();
-
-    return Vocabulary.fromJson(data);
+      // Mise à jour locale
+      final index = _vocabularies.indexWhere((v) => v.id == vocab.id);
+      if (index != -1) {
+        _vocabularies[index] = vocab;
+        notifyListeners();
+      }
+    } catch (e) {
+      debugPrint('Erreur updateVocabulary : $e');
+    }
   }
 
-
+  /// 🗑️ Supprimer
   Future<void> deleteVocabulary(String vocabId) async {
-    await supabase
-        .from('vocabulary')
-        .delete()
-        .eq('id', vocabId);
+    try {
+      await service.deleteVocabulary(vocabId);
+      _vocabularies.removeWhere((v) => v.id == vocabId);
+      notifyListeners();
+    } catch (e) {
+      debugPrint('Erreur deleteVocabulary : $e');
+    }
+  }
+
+  /// ⭐ Toggle Favoris
+  Future<void> toggleFavorite(Vocabulary vocab) async {
+    try {
+      final newValue = !vocab.isFavorite;
+      vocab.isFavorite = newValue;
+      notifyListeners();
+
+      await service.toggleFavorite(vocab.id, newValue);
+    } catch (e) {
+      debugPrint('Erreur toggleFavorite : $e');
+    }
+  }
+
+  /// 🔢 Nombre de mots appris
+  Future<int> getLearnedWordsCount() async {
+    return await service.getLearnedWordsCount();
   }
 
 
 
-  Future<int> getLearnedWordsCount() async {
-    final userId = Supabase.instance.client.auth.currentUser!.id;
-    final res = await supabase
-        .from('vocabulary')
-        .select('*')
-        .eq('user_id', userId)
-        .count();               // <-- utiliser .count() ici
+  Future<void> fetchFavoriteVocabulary() async {
+    try {
+      isLoading = true;
+      notifyListeners();
 
-    return res.count ?? 0;
+      final user = supabase.auth.currentUser;
+      if (user == null) {
+        _vocabularies = [];
+        return;
+      }
+
+      final response = await supabase
+          .from('vocabulary')
+          .select()
+          .eq('user_id', user.id)
+          .eq('is_favorite', true)
+          .order('created_at', ascending: false);
+
+      _vocabularies = (response as List)
+          .map((json) => Vocabulary.fromJson(json))
+          .toList();
+    } catch (e) {
+      debugPrint('Erreur fetchFavoriteVocabulary: $e');
+    } finally {
+      isLoading = false;
+      notifyListeners();
+    }
   }
 
 

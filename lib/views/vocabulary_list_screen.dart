@@ -32,10 +32,8 @@ class _VocabularyListScreenState extends State<VocabularyListScreen> {
   /// Dialogue pour ajouter ou modifier un mot
   void _showVocabularyDialog({Vocabulary? vocab}) {
     final wordController = TextEditingController(text: vocab?.word ?? '');
-    final definitionController =
-    TextEditingController(text: vocab?.definition ?? '');
-    final exampleController =
-    TextEditingController(text: vocab?.example ?? '');
+    final definitionController = TextEditingController(text: vocab?.definition ?? '');
+    final exampleController = TextEditingController(text: vocab?.example ?? '');
 
     showDialog(
       context: context,
@@ -54,15 +52,13 @@ class _VocabularyListScreenState extends State<VocabularyListScreen> {
               TextField(
                 controller: definitionController,
                 decoration: const InputDecoration(
-                    labelText: "Définition",
-                    prefixIcon: Icon(Icons.menu_book)),
+                    labelText: "Définition", prefixIcon: Icon(Icons.menu_book)),
               ),
               const SizedBox(height: 10),
               TextField(
                 controller: exampleController,
                 decoration: const InputDecoration(
-                    labelText: "Exemple (optionnel)",
-                    prefixIcon: Icon(Icons.edit)),
+                    labelText: "Exemple (optionnel)", prefixIcon: Icon(Icons.edit)),
               ),
             ],
           ),
@@ -96,6 +92,7 @@ class _VocabularyListScreenState extends State<VocabularyListScreen> {
                     bookId: widget.bookId,
                     userId: user.id,
                     isSynced: true,
+                    isFavorite: false,
                   );
 
                   await controller.addVocabulary(newVocab);
@@ -110,10 +107,10 @@ class _VocabularyListScreenState extends State<VocabularyListScreen> {
                     bookId: vocab.bookId,
                     userId: vocab.userId,
                     isSynced: true,
+                    isFavorite: vocab.isFavorite,
                   );
 
                   await controller.updateVocabulary(updatedVocab);
-                  await controller.fetchVocabulary(widget.bookId);
                 }
 
                 if (!mounted) return;
@@ -172,15 +169,13 @@ class _VocabularyListScreenState extends State<VocabularyListScreen> {
           onChanged: (value) => setState(() => _searchQuery = value),
         ),
       ),
-
       body: controller.isLoading
           ? const Center(child: CircularProgressIndicator())
           : RefreshIndicator(
         onRefresh: _refreshVocabulary,
         child: filteredList.isEmpty
             ? const Center(
-            child: Text("Aucun mot trouvé.",
-                style: TextStyle(fontSize: 16)))
+            child: Text("Aucun mot trouvé.", style: TextStyle(fontSize: 16)))
             : ListView.builder(
           padding: const EdgeInsets.all(12),
           itemCount: filteredList.length,
@@ -208,7 +203,6 @@ class _VocabularyListScreenState extends State<VocabularyListScreen> {
                 child: const Icon(Icons.delete, color: Colors.white),
               ),
               direction: DismissDirection.horizontal,
-
               confirmDismiss: (direction) async {
                 if (direction == DismissDirection.startToEnd) {
                   _showVocabularyDialog(vocab: vocab);
@@ -221,15 +215,13 @@ class _VocabularyListScreenState extends State<VocabularyListScreen> {
                       content: Text("Supprimer le mot \"${vocab.word}\" ?"),
                       actions: [
                         TextButton(
-                          onPressed: () =>
-                              Navigator.of(ctx).pop(false),
+                          onPressed: () => Navigator.of(ctx).pop(false),
                           child: const Text("Annuler"),
                         ),
                         ElevatedButton(
                           style: ElevatedButton.styleFrom(
                               backgroundColor: Colors.redAccent),
-                          onPressed: () =>
-                              Navigator.of(ctx).pop(true),
+                          onPressed: () => Navigator.of(ctx).pop(true),
                           child: const Text("Supprimer"),
                         ),
                       ],
@@ -238,55 +230,35 @@ class _VocabularyListScreenState extends State<VocabularyListScreen> {
                 }
                 return false;
               },
-
               onDismissed: (direction) async {
                 if (direction == DismissDirection.endToStart) {
                   final removed = vocab;
-
                   try {
-                    await context
-                        .read<VocabularyController>()
-                        .deleteVocabulary(vocab.id);
-
+                    await controller.deleteVocabulary(vocab.id);
                     if (!mounted) return;
-
-                   // ScaffoldMessenger.of(context).showSnackBars();
 
                     ScaffoldMessenger.of(context).showSnackBar(
                       SnackBar(
-                        content:
-                        Text('Mot supprimé: ${vocab.word}'),
+                        content: Text('Mot supprimé: ${vocab.word}'),
                         action: SnackBarAction(
                           label: 'Annuler',
                           onPressed: () async {
-                            await context
-                                .read<VocabularyController>()
-                                .addVocabulary(removed);
-                            await context
-                                .read<VocabularyController>()
-                                .fetchVocabulary(widget.bookId);
+                            await controller.addVocabulary(removed);
+                            await controller.fetchVocabulary(widget.bookId);
                           },
                         ),
                       ),
                     );
                   } catch (e) {
                     debugPrint('Erreur suppression vocab: $e');
-
-                    await context
-                        .read<VocabularyController>()
-                        .fetchVocabulary(widget.bookId);
-
+                    await controller.fetchVocabulary(widget.bookId);
                     if (!mounted) return;
-
                     ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                          content: Text(
-                              "Erreur lors de la suppression.")),
+                      const SnackBar(content: Text("Erreur lors de la suppression.")),
                     );
                   }
                 }
               },
-
               child: Card(
                 elevation: 3,
                 margin: const EdgeInsets.symmetric(vertical: 8),
@@ -300,22 +272,31 @@ class _VocabularyListScreenState extends State<VocabularyListScreen> {
                     children: [
                       Row(
                         children: [
-                          const Icon(Icons.lightbulb_outline,
-                              color: Colors.deepPurple),
+                          const Icon(Icons.lightbulb_outline, color: Colors.deepPurple),
                           const SizedBox(width: 8),
                           Expanded(
-                            child: Text(vocab.word,
-                                style: const TextStyle(
-                                    fontSize: 18,
-                                    fontWeight: FontWeight.bold)),
+                            child: Text(
+                              vocab.word,
+                              style: const TextStyle(
+                                  fontSize: 18, fontWeight: FontWeight.bold),
+                            ),
+                          ),
+                          // ⭐ Bouton Favoris
+                          IconButton(
+                            icon: Icon(
+                              vocab.isFavorite ? Icons.star : Icons.star_border,
+                              color: Colors.amber,
+                            ),
+                            onPressed: () async {
+                              await controller.toggleFavorite(vocab);
+                            },
                           ),
                         ],
                       ),
                       const SizedBox(height: 8),
                       Text("Définition : ${vocab.definition}",
                           style: const TextStyle(fontSize: 16)),
-                      if (vocab.example != null &&
-                          vocab.example!.trim().isNotEmpty)
+                      if (vocab.example != null && vocab.example!.trim().isNotEmpty)
                         ...[
                           const SizedBox(height: 6),
                           Text(
@@ -334,7 +315,6 @@ class _VocabularyListScreenState extends State<VocabularyListScreen> {
           },
         ),
       ),
-
       floatingActionButton: FloatingActionButton.extended(
         heroTag: 'addVocabulary',
         backgroundColor: Colors.deepPurple.shade700,

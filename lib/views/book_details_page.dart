@@ -280,6 +280,7 @@ class _BookDetailScreenState extends State<BookDetailScreen> {
           createdAt: DateTime.now(),
           userId: user.id,
           isSynced: true,
+          isFavorite: false,
         );
 
         await context.read<VocabularyController>().addVocabulary(vocab);
@@ -359,7 +360,7 @@ class _BookDetailScreenState extends State<BookDetailScreen> {
           },
           onDismissed: (direction) async {
             if (direction == DismissDirection.endToStart) {
-              await excerptController.deleteExcerpt(ex.id);
+              await excerptController.deleteExcerpt(ex.id, ex.chapterId);
               ScaffoldMessenger.of(context).showSnackBar(
                 const SnackBar(
                   content: Text("Extrait supprimé ❌"),

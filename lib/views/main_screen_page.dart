@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:memo_livre/views/favorite_vocabulary_page.dart';
 import 'package:provider/provider.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../controllers/book_controller.dart';
 import '../controllers/vocabulary_controller.dart';
 import '../views/book_screen.dart';
+import 'about_page.dart';
 import 'favorites_book_page.dart';
 
 class DashboardScreen extends StatefulWidget {
@@ -21,12 +23,9 @@ class _DashboardScreenState extends State<DashboardScreen>
   String displayName = 'Utilisateur';
   late final VocabularyController vocabularyController = VocabularyController();
 
-  //late VocabularyController vocabularyController;
-
   @override
   void initState() {
     super.initState();
-    //vocabularyController = VocabularyController();
     _loadDisplayName();
 
     _controller = AnimationController(
@@ -148,19 +147,32 @@ class _DashboardScreenState extends State<DashboardScreen>
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        _buildStatCard(
-                          "Favoris Livres",
-                          "${bookController.books.length}",
-                          Icons.menu_book_rounded,
-                          Colors.deepPurple,
+                        // ✅ Compteur Livres lus avec FutureBuilder
+                        FutureBuilder<int>(
+                          future: bookController.getReadBooksCount(),
+                          builder: (context, snapshot) {
+                            String value = "0";
+                            if (snapshot.connectionState == ConnectionState.waiting) {
+                              value = "...";
+                            } else if (snapshot.hasData) {
+                              value = snapshot.data.toString();
+                            }
+                            return _buildStatCard(
+                              "Livres lus",
+                              value,
+                              Icons.menu_book_rounded,
+                              Colors.deepPurple,
+                            );
+                          },
                         ),
-                        _buildStatCard(
+                        // Statique pour Favoris (tu peux remplacer par un futur si besoin)
+                        /*_buildStatCard(
                           "Favoris",
                           "0",
                           Icons.favorite,
                           Colors.redAccent,
-                        ),
-                        // ✅ Compteur mots appris avec FutureBuilder
+                        ),*/
+                        // Compteur Mots appris
                         FutureBuilder<int>(
                           future: vocabularyController.getLearnedWordsCount(),
                           builder: (context, snapshot) {
@@ -194,23 +206,31 @@ class _DashboardScreenState extends State<DashboardScreen>
                       mainAxisAlignment: MainAxisAlignment.spaceAround,
                       children: [
                         _buildQuickAction(
-                          icon: Icons.book_rounded,
+                          icon: Icons.menu_book_sharp,
                           label: "Livres",
                           color: Colors.deepPurple,
                           onTap: () => Navigator.of(context).push(_createRoute()),
                         ),
                         _buildQuickAction(
-                          icon: Icons.star_border_rounded,
-                          label: "Favoris",
+                          icon: Icons.favorite_border,
+                          label: "Favoris Livres",
                           color: Colors.deepPurple.shade300,
                           onTap: () =>
                               Navigator.of(context).push(_createRouteFavoritePage()),
                         ),
                         _buildQuickAction(
-                          icon: Icons.person_outline,
-                          label: "Profil",
+                          icon: Icons.star_border,
+                          label: "Favoris mots",
                           color: Colors.deepPurple.shade200,
-                          onTap: () {},
+                          onTap: () =>
+                              Navigator.of(context).push(_createFavorisMotsPage()),
+                        ),
+                        _buildQuickAction(
+                          icon: Icons.ad_units,
+                          label: "eRead",
+                          color: Colors.deepPurple.shade200,
+                          onTap: () =>
+                              Navigator.of(context).push(_createRouteAboutPage()),
                         ),
                       ],
                     ),
@@ -305,6 +325,34 @@ class _DashboardScreenState extends State<DashboardScreen>
     return PageRouteBuilder(
       pageBuilder: (context, animation, secondaryAnimation) =>
       const FavoriteBooksPage(),
+      transitionsBuilder: (context, animation, secondaryAnimation, child) {
+        const begin = Offset(0.0, 1.0);
+        const end = Offset.zero;
+        final tween =
+        Tween(begin: begin, end: end).chain(CurveTween(curve: Curves.easeOut));
+        return SlideTransition(position: animation.drive(tween), child: child);
+      },
+    );
+  }
+
+  Route _createRouteAboutPage() {
+    return PageRouteBuilder(
+      pageBuilder: (context, animation, secondaryAnimation) =>
+      const AboutPage(),
+      transitionsBuilder: (context, animation, secondaryAnimation, child) {
+        const begin = Offset(0.0, 1.0);
+        const end = Offset.zero;
+        final tween =
+        Tween(begin: begin, end: end).chain(CurveTween(curve: Curves.easeOut));
+        return SlideTransition(position: animation.drive(tween), child: child);
+      },
+    );
+  }
+
+  Route _createFavorisMotsPage() {
+    return PageRouteBuilder(
+      pageBuilder: (context, animation, secondaryAnimation) =>
+      const FavoriteVocabularyScreen(),
       transitionsBuilder: (context, animation, secondaryAnimation, child) {
         const begin = Offset(0.0, 1.0);
         const end = Offset.zero;
